@@ -1,0 +1,19 @@
+apiVersion: jumpstarter.dev/v1alpha1
+kind: ExporterConfig
+metadata:
+  namespace: default
+  name: demo
+endpoint: grpc.jumpstarter.example.com:8082
+token: "<token>"
+export:
+  power:
+    type: jumpstarter_driver_tuya.driver.TuyaPower
+    config:
+      # Name or id from a TinyTuya devices.json file
+      device: Mini Plug
+      # Optional path to TinyTuya DEVICEFILE (default: devices.json in the process cwd)
+      # devices_file: /path/to/devices.json
+      # Optional switch DPS id (default: 1)
+      # switch_dp: 1
+      # Optional socket timeout in seconds
+      # timeout: 5.0
