@@ -1,0 +1,46 @@
+[project]
+name = "jumpstarter-driver-tuya"
+dynamic = ["version", "urls"]
+description = "Jumpstarter power driver for Tuya-compatible smart plugs via TinyTuya LAN control"
+readme = "README.md"
+license = "Apache-2.0"
+authors = [
+    { name = "Roddie Kieley", email = "rkieley@redhat.com" }
+]
+requires-python = ">=3.11"
+dependencies = [
+    "anyio>=4.10.0",
+    "jumpstarter",
+    "jumpstarter-driver-power",
+    "tinytuya>=1.20.0",
+]
+
+[project.entry-points."jumpstarter.drivers"]
+TuyaPower = "jumpstarter_driver_tuya.driver:TuyaPower"
+
+[tool.hatch.version]
+source = "vcs"
+raw-options = { 'root' = '../../../' }
+
+[tool.hatch.metadata.hooks.vcs.urls]
+Homepage = "https://jumpstarter.dev"
+source_archive = "https://github.com/jumpstarter-dev/repo/archive/{commit_hash}.zip"
+
+[tool.pytest.ini_options]
+addopts = "--cov --cov-report=html --cov-report=xml"
+log_cli = true
+log_cli_level = "INFO"
+testpaths = ["jumpstarter_driver_tuya"]
+
+[build-system]
+requires = ["hatchling", "hatch-vcs", "hatch-pin-jumpstarter"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.hooks.pin_jumpstarter]
+name = "pin_jumpstarter"
+
+[dependency-groups]
+dev = [
+    "pytest-cov>=6.0.0",
+    "pytest>=8.3.3",
+]
