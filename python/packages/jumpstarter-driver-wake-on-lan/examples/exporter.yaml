@@ -1,0 +1,12 @@
+apiVersion: jumpstarter.dev/v1alpha1
+kind: ExporterConfig
+metadata:
+  namespace: default
+  name: demo
+export:
+  wol:
+    type: jumpstarter_driver_wake_on_lan.driver.WakeOnLan
+    config:
+      mac: "50:7b:9d:07:eb:98"
+      broadcast: "255.255.255.255"
+      port: 9
