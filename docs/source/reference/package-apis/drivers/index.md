@@ -22,6 +22,7 @@ Drivers that control the power state and basic operation of devices:
 - {doc}`Tasmota <tasmota>` (`jumpstarter-driver-tasmota`) - Tasmota device control
 - {doc}`HTTP Power <http-power>` (`jumpstarter-driver-http-power`) - HTTP-based power control for smart sockets
 - {doc}`Noyito Relay <noyito-relay>` (`jumpstarter-driver-noyito-relay`) - NOYITO USB relay board control
+- {doc}`Wake-on-LAN <wake-on-lan>` (`jumpstarter-driver-wake-on-lan`) - Wake-on-LAN magic packet sender
 
 ### Communication
 
@@ -148,6 +149,7 @@ uds-doip.md
 ustreamer.md
 video.md
 vnc.md
+wake-on-lan.md
 xcp.md
 yepkit.md
 ```
