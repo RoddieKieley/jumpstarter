@@ -395,6 +395,23 @@ func (r *JumpstarterReconciler) collectTelemetryDNSNames(js *operatorv1alpha1.Ju
 			fmt.Sprintf("%s.%s.svc.cluster.local", telemetryServiceName, js.Namespace),
 		)
 	}
+	if js.Spec.Telemetry != nil {
+		for _, endpoint := range js.Spec.Telemetry.Endpoints {
+			if endpoint.Address == "" {
+				continue
+			}
+			host := extractHostname(endpoint.Address)
+			if host != "" && !contains(dnsNames, host) {
+				dnsNames = append(dnsNames, host)
+			}
+		}
+	}
+	if js.Spec.BaseDomain != "" {
+		defaultName := fmt.Sprintf("telemetry.%s", js.Spec.BaseDomain)
+		if !contains(dnsNames, defaultName) {
+			dnsNames = append(dnsNames, defaultName)
+		}
+	}
 	return dnsNames
 }
 

@@ -111,6 +111,31 @@ var _ = Describe("ApplyEndpointDefaults", func() {
 			Expect(spec.Controller.Login.Endpoints[0].ClusterIP).NotTo(BeNil())
 			Expect(spec.Controller.Login.Endpoints[0].ClusterIP.Enabled).To(BeTrue())
 		})
+
+		It("should generate telemetry endpoint with Route when telemetry is enabled", func() {
+			spec := &operatorv1alpha1.JumpstarterSpec{
+				BaseDomain: "example.com",
+				Telemetry:  &operatorv1alpha1.TelemetryConfig{Enabled: true},
+			}
+
+			ApplyEndpointDefaults(spec, true, true)
+
+			Expect(spec.Telemetry.Endpoints).To(HaveLen(1))
+			Expect(spec.Telemetry.Endpoints[0].Address).To(Equal("telemetry.example.com"))
+			Expect(spec.Telemetry.Endpoints[0].Route).NotTo(BeNil())
+			Expect(spec.Telemetry.Endpoints[0].Route.Enabled).To(BeTrue())
+		})
+
+		It("should not generate telemetry endpoints when telemetry is disabled", func() {
+			spec := &operatorv1alpha1.JumpstarterSpec{
+				BaseDomain: "example.com",
+				Telemetry:  &operatorv1alpha1.TelemetryConfig{Enabled: false},
+			}
+
+			ApplyEndpointDefaults(spec, true, true)
+
+			Expect(spec.Telemetry.Endpoints).To(BeEmpty())
+		})
 	})
 
 	Context("when endpoints already exist", func() {
@@ -124,12 +149,20 @@ var _ = Describe("ApplyEndpointDefaults", func() {
 						},
 					},
 				},
+				Telemetry: &operatorv1alpha1.TelemetryConfig{
+					Enabled: true,
+					Endpoints: []operatorv1alpha1.Endpoint{
+						{Address: "custom-telemetry.example.com", ClusterIP: &operatorv1alpha1.ClusterIPConfig{Enabled: true}},
+					},
+				},
 			}
 
 			ApplyEndpointDefaults(spec, true, true)
 
 			Expect(spec.Controller.GRPC.Endpoints).To(HaveLen(1))
 			Expect(spec.Controller.GRPC.Endpoints[0].Address).To(Equal("custom.example.com"))
+			Expect(spec.Telemetry.Endpoints).To(HaveLen(1))
+			Expect(spec.Telemetry.Endpoints[0].Address).To(Equal("custom-telemetry.example.com"))
 		})
 
 		It("should ensure existing endpoints have a service type enabled", func() {

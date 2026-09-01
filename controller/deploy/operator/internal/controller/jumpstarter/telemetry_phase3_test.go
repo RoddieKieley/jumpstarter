@@ -82,6 +82,16 @@ var _ = Describe("createTelemetryDeployment JEP-0013 Phase 3", func() {
 		Expect(envValue(c, "GRPC_TELEMETRY_ENDPOINT")).To(Equal(telemetryEndpointFor(js.Namespace)))
 	})
 
+	It("sets GRPC_TELEMETRY_ENDPOINT to the first telemetry endpoint with port 443", func() {
+		js := phase3TelemetryJS("js", "jumpstarter-lab")
+		js.Spec.Telemetry.Endpoints = []operatorv1alpha1.Endpoint{
+			{Address: "telemetry.jumpstarter.jumpstarter-lab.apps.okd.kieley.io"},
+		}
+		c := createTelemetryDeployment(js, "").Spec.Template.Spec.Containers[0]
+		Expect(envValue(c, "GRPC_TELEMETRY_ENDPOINT")).To(Equal(
+			"telemetry.jumpstarter.jumpstarter-lab.apps.okd.kieley.io:443"))
+	})
+
 	It("exposes container port metrics on 8080", func() {
 		c := createTelemetryDeployment(phase3TelemetryJS("js", "ns"), "").Spec.Template.Spec.Containers[0]
 		p := namedContainerPort(c.Ports, metricsPortName)
@@ -135,6 +145,28 @@ var _ = Describe("Telemetry ConfigMap certificate (JEP-0013 TLS)", func() {
 		Expect(cfg.Telemetry.Enabled).To(BeTrue())
 		Expect(cfg.Telemetry.Endpoint).To(Equal(telemetryEndpointFor(crNamespace)))
 		Expect(cfg.Telemetry.Certificate).To(Equal(testPEM))
+	})
+
+	It("advertises the first telemetry endpoint address with port 443", func() {
+		js := &operatorv1alpha1.Jumpstarter{
+			ObjectMeta: metav1.ObjectMeta{Name: crName, Namespace: crNamespace},
+			Spec: operatorv1alpha1.JumpstarterSpec{
+				CertManager: operatorv1alpha1.CertManagerConfig{Enabled: false},
+				Telemetry: &operatorv1alpha1.TelemetryConfig{
+					Enabled: true,
+					Image:   "quay.io/jumpstarter-dev/jumpstarter-telemetry:latest",
+					Endpoints: []operatorv1alpha1.Endpoint{
+						{Address: "telemetry.example.com"},
+					},
+				},
+			},
+		}
+
+		r := &JumpstarterReconciler{Client: k8sClient, Scheme: k8sClient.Scheme()}
+		cfg, err := r.buildConfig(ctx, js)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(cfg.Telemetry).NotTo(BeNil())
+		Expect(cfg.Telemetry.Endpoint).To(Equal("telemetry.example.com:443"))
 	})
 
 	It("omits the telemetry certificate when cert-manager is disabled", func() {

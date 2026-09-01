@@ -346,7 +346,7 @@ var _ = Describe("Telemetry Lifecycle", func() {
 		configData := getConfigData()
 		Expect(configData).To(ContainSubstring("telemetry"))
 		Expect(configData).To(ContainSubstring("enabled: true"))
-		Expect(configData).To(ContainSubstring(telemetryServiceName))
+		Expect(configData).To(ContainSubstring("telemetry.example.com:443"))
 		Expect(configData).To(ContainSubstring("warning"))
 	})
 
@@ -636,6 +636,48 @@ var _ = Describe("telemetryEndpointFor", func() {
 	})
 })
 
+var _ = Describe("advertisedTelemetryEndpoint", func() {
+	It("falls back to the in-cluster Service when no endpoints are set", func() {
+		js := &operatorv1alpha1.Jumpstarter{
+			ObjectMeta: metav1.ObjectMeta{Name: "js", Namespace: "lab"},
+			Spec: operatorv1alpha1.JumpstarterSpec{
+				Telemetry: &operatorv1alpha1.TelemetryConfig{Enabled: true},
+			},
+		}
+		Expect(advertisedTelemetryEndpoint(js)).To(Equal(telemetryEndpointFor("lab")))
+	})
+
+	It("uses the first endpoint address with default port 443", func() {
+		js := &operatorv1alpha1.Jumpstarter{
+			ObjectMeta: metav1.ObjectMeta{Name: "js", Namespace: "lab"},
+			Spec: operatorv1alpha1.JumpstarterSpec{
+				Telemetry: &operatorv1alpha1.TelemetryConfig{
+					Enabled: true,
+					Endpoints: []operatorv1alpha1.Endpoint{
+						{Address: "telemetry.example.com"},
+					},
+				},
+			},
+		}
+		Expect(advertisedTelemetryEndpoint(js)).To(Equal("telemetry.example.com:443"))
+	})
+
+	It("preserves an explicit port on the endpoint address", func() {
+		js := &operatorv1alpha1.Jumpstarter{
+			ObjectMeta: metav1.ObjectMeta{Name: "js", Namespace: "lab"},
+			Spec: operatorv1alpha1.JumpstarterSpec{
+				Telemetry: &operatorv1alpha1.TelemetryConfig{
+					Enabled: true,
+					Endpoints: []operatorv1alpha1.Endpoint{
+						{Address: "okd.example.com:30093"},
+					},
+				},
+			},
+		}
+		Expect(advertisedTelemetryEndpoint(js)).To(Equal("okd.example.com:30093"))
+	})
+})
+
 var _ = Describe("telemetryLabels", func() {
 	It("returns correct labels", func() {
 		js := &operatorv1alpha1.Jumpstarter{
@@ -720,6 +762,44 @@ var _ = Describe("collectTelemetryDNSNames", func() {
 		Expect(dnsNames).To(ContainElement(telemetryServiceName + ".my-ns"))
 		Expect(dnsNames).To(ContainElement(telemetryServiceName + ".my-ns.svc"))
 		Expect(dnsNames).To(ContainElement(telemetryServiceName + ".my-ns.svc.cluster.local"))
+	})
+
+	It("includes telemetry endpoint hostnames and telemetry.<baseDomain>", func() {
+		js := &operatorv1alpha1.Jumpstarter{
+			ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "my-ns"},
+			Spec: operatorv1alpha1.JumpstarterSpec{
+				BaseDomain: "jumpstarter.lab.example.com",
+				Telemetry: &operatorv1alpha1.TelemetryConfig{
+					Enabled: true,
+					Endpoints: []operatorv1alpha1.Endpoint{
+						{Address: "telemetry.jumpstarter.lab.example.com:443"},
+					},
+				},
+			},
+		}
+		r := &JumpstarterReconciler{}
+		dnsNames := r.collectTelemetryDNSNames(js, true)
+
+		Expect(dnsNames).To(ContainElement(telemetryServiceName + ".my-ns.svc"))
+		Expect(dnsNames).To(ContainElement("telemetry.jumpstarter.lab.example.com"))
+	})
+
+	It("includes endpoint hostnames when includeInternalNames is false", func() {
+		js := &operatorv1alpha1.Jumpstarter{
+			ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "my-ns"},
+			Spec: operatorv1alpha1.JumpstarterSpec{
+				Telemetry: &operatorv1alpha1.TelemetryConfig{
+					Enabled: true,
+					Endpoints: []operatorv1alpha1.Endpoint{
+						{Address: "telemetry.example.com"},
+					},
+				},
+			},
+		}
+		r := &JumpstarterReconciler{}
+		dnsNames := r.collectTelemetryDNSNames(js, false)
+
+		Expect(dnsNames).To(Equal([]string{"telemetry.example.com"}))
 	})
 
 	It("returns empty when includeInternalNames is false", func() {

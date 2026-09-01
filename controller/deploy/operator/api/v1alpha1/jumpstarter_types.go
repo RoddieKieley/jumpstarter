@@ -282,7 +282,9 @@ type DeprecatedLabelsConfig struct {
 type TelemetryConfig struct {
 	// Enable the telemetry service deployment.
 	// When enabled, the operator deploys a jumpstarter-telemetry pod and a ClusterIP
-	// Service, and configures the controller to advertise the endpoint to exporters.
+	// Service. External access (Route, Ingress, NodePort, LoadBalancer) follows
+	// endpoints, matching controller gRPC. GetServiceEndpoints advertises the first
+	// endpoint address (port 443 by default) so out-of-cluster exporters can connect.
 	// +kubebuilder:default=false
 	Enabled bool `json:"enabled,omitempty"`
 
@@ -323,6 +325,12 @@ type TelemetryConfig struct {
 
 	// Backpressure configures the Loki log push ring buffer.
 	Backpressure TelemetryBackpressureConfig `json:"backpressure,omitempty"`
+
+	// External gRPC endpoints for the telemetry service (Route, Ingress,
+	// NodePort, LoadBalancer). When omitted and baseDomain is set, the
+	// operator generates telemetry.<baseDomain> the same way it generates
+	// grpc.<baseDomain> for the controller.
+	Endpoints []Endpoint `json:"endpoints,omitempty"`
 }
 
 // TelemetryLokiConfig configures Loki HTTP push from the telemetry service.

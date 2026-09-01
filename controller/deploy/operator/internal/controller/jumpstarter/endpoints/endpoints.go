@@ -223,6 +223,52 @@ func (r *Reconciler) ReconcileControllerEndpoint(ctx context.Context, owner meta
 	return nil
 }
 
+// ReconcileTelemetryEndpoint reconciles Route, Ingress, NodePort, and LoadBalancer
+// for the telemetry gRPC service. The dual-port ClusterIP (gRPC + /metrics) is
+// owned by reconcileTelemetryService; this method must not recreate it.
+func (r *Reconciler) ReconcileTelemetryEndpoint(ctx context.Context, owner metav1.Object, endpoint *operatorv1alpha1.Endpoint, servicePort corev1.ServicePort) error {
+	baseLabels := map[string]string{
+		"component":  "telemetry",
+		"app":        "jumpstarter-telemetry",
+		"controller": owner.GetName(),
+	}
+	podSelector := map[string]string{
+		"app": "jumpstarter-telemetry",
+	}
+
+	if endpoint.Ingress != nil && endpoint.Ingress.Enabled {
+		if err := r.createIngressForEndpoint(ctx, owner, servicePort.Name, servicePort.Port, endpoint, baseLabels); err != nil {
+			return err
+		}
+	}
+
+	if endpoint.Route != nil && endpoint.Route.Enabled {
+		if err := r.createRouteForEndpoint(ctx, owner, servicePort.Name, servicePort.Port, endpoint, baseLabels); err != nil {
+			return err
+		}
+	}
+
+	if endpoint.LoadBalancer != nil && endpoint.LoadBalancer.Enabled {
+		if err := r.createService(ctx, owner, servicePort, "-lb", corev1.ServiceTypeLoadBalancer,
+			podSelector, baseLabels, endpoint.LoadBalancer.Annotations, endpoint.LoadBalancer.Labels); err != nil {
+			return err
+		}
+	}
+
+	if endpoint.NodePort != nil && endpoint.NodePort.Enabled {
+		nodePortServicePort := servicePort
+		if endpoint.NodePort.Port > 0 {
+			nodePortServicePort.NodePort = endpoint.NodePort.Port
+		}
+		if err := r.createService(ctx, owner, nodePortServicePort, "-np", corev1.ServiceTypeNodePort,
+			podSelector, baseLabels, endpoint.NodePort.Annotations, endpoint.NodePort.Labels); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 // ReconcileRouterReplicaEndpoint reconciles service, ingress, and route for a specific router replica endpoint
 // This function creates a separate service for each enabled service type (ClusterIP, NodePort, LoadBalancer)
 func (r *Reconciler) ReconcileRouterReplicaEndpoint(ctx context.Context, owner metav1.Object, replicaIndex int32, endpointIdx int, endpoint *operatorv1alpha1.Endpoint, servicePort corev1.ServicePort) error {

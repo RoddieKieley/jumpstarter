@@ -23,8 +23,10 @@ import (
 	"time"
 
 	certmanagerv1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
+	routev1 "github.com/openshift/api/route/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	networkingv1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -122,6 +124,10 @@ func (r *JumpstarterReconciler) reconcileTelemetryServiceStage(ctx context.Conte
 		return fmt.Errorf("failed to reconcile telemetry service: %w", err)
 	}
 
+	if err := r.reconcileTelemetryEndpoints(ctx, jumpstarter); err != nil {
+		return fmt.Errorf("failed to reconcile telemetry endpoints: %w", err)
+	}
+
 	return nil
 }
 
@@ -140,7 +146,7 @@ func (r *JumpstarterReconciler) cleanupTelemetryService(ctx context.Context, jum
 		log.Info("Deleted telemetry service", "name", telemetryServiceName)
 	}
 
-	return nil
+	return r.cleanupTelemetryExternalNetworking(ctx, jumpstarter)
 }
 
 // telemetryTLSSecretName returns the TLS secret name for telemetry.
@@ -385,7 +391,7 @@ func createTelemetryDeployment(jumpstarter *operatorv1alpha1.Jumpstarter, tlsSec
 		},
 		{
 			Name:  "GRPC_TELEMETRY_ENDPOINT",
-			Value: telemetryEndpointFor(jumpstarter.Namespace),
+			Value: advertisedTelemetryEndpoint(jumpstarter),
 		},
 	}
 
@@ -658,9 +664,98 @@ func (r *JumpstarterReconciler) telemetryCANeedsRequeue(ctx context.Context, jum
 	return err != nil || caCert == ""
 }
 
+// reconcileTelemetryEndpoints creates Route/Ingress/NodePort/LoadBalancer for
+// spec.telemetry.endpoints. The ClusterIP Service is reconciled separately so
+// the /metrics port is preserved.
+func (r *JumpstarterReconciler) reconcileTelemetryEndpoints(ctx context.Context, jumpstarter *operatorv1alpha1.Jumpstarter) error {
+	if r.EndpointReconciler == nil {
+		return nil
+	}
+	t := jumpstarter.Spec.Telemetry
+	if t == nil || !t.Enabled || len(t.Endpoints) == 0 {
+		return r.cleanupTelemetryExternalNetworking(ctx, jumpstarter)
+	}
+
+	appProtocol := appProtocolH2C
+	for i := range t.Endpoints {
+		endpoint := t.Endpoints[i]
+		svcPort := corev1.ServicePort{
+			Name:        telemetryServiceName,
+			Port:        int32(telemetryPort),
+			TargetPort:  intstr.FromInt(telemetryPort),
+			Protocol:    corev1.ProtocolTCP,
+			AppProtocol: &appProtocol,
+		}
+		if endpoint.NodePort != nil && endpoint.NodePort.Enabled && endpoint.NodePort.Port > 0 {
+			svcPort.NodePort = endpoint.NodePort.Port
+		}
+		if err := r.EndpointReconciler.ReconcileTelemetryEndpoint(ctx, jumpstarter, &endpoint, svcPort); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// cleanupTelemetryExternalNetworking deletes Route/Ingress/NodePort/LB objects
+// created for telemetry gRPC. The dual-port ClusterIP is handled separately.
+func (r *JumpstarterReconciler) cleanupTelemetryExternalNetworking(ctx context.Context, jumpstarter *operatorv1alpha1.Jumpstarter) error {
+	log := logf.FromContext(ctx)
+	ns := jumpstarter.Namespace
+
+	if r.EndpointReconciler != nil && r.EndpointReconciler.RouteAvailable {
+		route := &routev1.Route{}
+		route.Name = telemetryServiceName + "-route"
+		route.Namespace = ns
+		if err := r.Delete(ctx, route); err != nil && !errors.IsNotFound(err) && !meta.IsNoMatchError(err) {
+			return fmt.Errorf("failed to delete telemetry route: %w", err)
+		} else if err == nil {
+			log.Info("Deleted telemetry route", "name", route.Name)
+		}
+	}
+
+	ing := &networkingv1.Ingress{}
+	ing.Name = telemetryServiceName + "-ing"
+	ing.Namespace = ns
+	if err := r.Delete(ctx, ing); err != nil && !errors.IsNotFound(err) {
+		return fmt.Errorf("failed to delete telemetry ingress: %w", err)
+	} else if err == nil {
+		log.Info("Deleted telemetry ingress", "name", ing.Name)
+	}
+
+	for _, name := range []string{telemetryServiceName + "-np", telemetryServiceName + "-lb"} {
+		svc := &corev1.Service{}
+		svc.Name = name
+		svc.Namespace = ns
+		if err := r.Delete(ctx, svc); err != nil && !errors.IsNotFound(err) {
+			return fmt.Errorf("failed to delete telemetry service %s: %w", name, err)
+		} else if err == nil {
+			log.Info("Deleted telemetry service", "name", name)
+		}
+	}
+	return nil
+}
+
 // telemetryEndpointFor returns the in-cluster gRPC endpoint for the telemetry service.
 func telemetryEndpointFor(namespace string) string {
 	return fmt.Sprintf("%s.%s.svc:%d", telemetryServiceName, namespace, telemetryPort)
+}
+
+// advertisedTelemetryEndpoint is the host:port exporters and clients receive from
+// GetServiceEndpoints. Prefer the first spec.telemetry.endpoints address (default
+// port 443 for Route/Ingress TLS passthrough). Fall back to the in-cluster Service.
+func advertisedTelemetryEndpoint(js *operatorv1alpha1.Jumpstarter) string {
+	internal := telemetryEndpointFor(js.Namespace)
+	t := js.Spec.Telemetry
+	if t == nil || !t.Enabled {
+		return internal
+	}
+	if len(t.Endpoints) > 0 && t.Endpoints[0].Address != "" {
+		return ensurePort(t.Endpoints[0].Address, "443")
+	}
+	if js.Spec.BaseDomain != "" {
+		return ensurePort(fmt.Sprintf("telemetry.%s", js.Spec.BaseDomain), "443")
+	}
+	return internal
 }
 
 // telemetryLabels returns the standard labels for telemetry resources.
