@@ -83,6 +83,23 @@ func ApplyEndpointDefaults(spec *operatorv1alpha1.JumpstarterSpec, routeAvailabl
 		}
 	}
 
+	// Generate default telemetry gRPC endpoint when telemetry is enabled.
+	// Skip when telemetry is off so we do not invent a Route for a service that
+	// will not be deployed.
+	if spec.Telemetry != nil && spec.Telemetry.Enabled {
+		if len(spec.Telemetry.Endpoints) == 0 {
+			endpoint := operatorv1alpha1.Endpoint{
+				Address: fmt.Sprintf("telemetry.%s", spec.BaseDomain),
+			}
+			ensureEndpointServiceType(&endpoint, routeAvailable, ingressAvailable)
+			spec.Telemetry.Endpoints = []operatorv1alpha1.Endpoint{endpoint}
+		} else {
+			for i := range spec.Telemetry.Endpoints {
+				ensureEndpointServiceType(&spec.Telemetry.Endpoints[i], routeAvailable, ingressAvailable)
+			}
+		}
+	}
+
 	// Generate default login endpoint if none specified
 	// Login endpoints use edge TLS termination (not passthrough like gRPC)
 	if len(spec.Controller.Login.Endpoints) == 0 {

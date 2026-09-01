@@ -1308,7 +1308,7 @@ func (r *JumpstarterReconciler) buildConfig(ctx context.Context, jumpstarter *op
 		if telemetryReplicas(t) > 0 {
 			telemetryCfg := &config.Telemetry{
 				Enabled:  true,
-				Endpoint: telemetryEndpointFor(jumpstarter.Namespace),
+				Endpoint: advertisedTelemetryEndpoint(jumpstarter),
 			}
 			if t.Logging.Filter.MinSeverity != "" {
 				telemetryCfg.Logging.Filter.MinSeverity = t.Logging.Filter.MinSeverity

@@ -20,6 +20,7 @@ Drivers that control the power state and basic operation of devices:
 - {doc}`DUT Link <dutlink>` (`jumpstarter-driver-dutlink`) - [DUT Link Board](https://github.com/jumpstarter-dev/dutlink-board) hardware control
 - {doc}`Energenie PDU <energenie>` (`jumpstarter-driver-energenie`) - Energenie PDU control
 - {doc}`Tasmota <tasmota>` (`jumpstarter-driver-tasmota`) - Tasmota device control
+- {doc}`Tuya <tuya>` (`jumpstarter-driver-tuya`) - Tuya-compatible smart plug power control
 - {doc}`HTTP Power <http-power>` (`jumpstarter-driver-http-power`) - HTTP-based power control for smart sockets
 - {doc}`Noyito Relay <noyito-relay>` (`jumpstarter-driver-noyito-relay`) - NOYITO USB relay board control
 - {doc}`Wake-on-LAN <wake-on-lan>` (`jumpstarter-driver-wake-on-lan`) - Wake-on-LAN magic packet sender
@@ -156,6 +157,7 @@ stlink-msd.md
 tasmota.md
 tftp.md
 tmt.md
+tuya.md
 uboot.md
 uds.md
 uds-can.md

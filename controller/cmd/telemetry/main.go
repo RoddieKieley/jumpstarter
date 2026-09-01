@@ -26,10 +26,12 @@ limitations under the License.
 // so exporters can verify the TLS connection.
 //
 // Endpoint: GRPC_TELEMETRY_ENDPOINT must be set on BOTH this pod and the controller
-// pod to the same value (e.g. "jumpstarter-telemetry.jumpstarter.svc:9093").
-// The telemetry service uses it to generate the correct SAN in the self-signed
-// certificate; the controller uses it to advertise the address to exporters via
-// GetServiceEndpoints. A mismatch causes TLS hostname verification failures.
+// pod to the same value. In-cluster: "jumpstarter-telemetry.<ns>.svc:9093".
+// Out-of-cluster Route/Ingress: the advertised hostname with port 443, e.g.
+// "telemetry.jumpstarter.example.com:443". The telemetry service uses it to
+// generate the correct SAN in the self-signed certificate; the controller uses
+// it to advertise the address to exporters via GetServiceEndpoints. A mismatch
+// causes TLS hostname verification failures.
 //
 // HTTP: GET /metrics, /healthz, and /readyz bind separately (default :8080).
 package main

@@ -619,4 +619,84 @@ var _ = Describe("Endpoints Reconciler", func() {
 		})
 	})
 
+	Context("When reconciling telemetry endpoints", func() {
+		const namespace = "test-namespace"
+
+		ctx := context.Background()
+		var reconciler *Reconciler
+		var owner *corev1.ConfigMap
+
+		BeforeEach(func() {
+			reconciler = NewReconciler(k8sClient, k8sClient.Scheme(), cfg)
+			ns := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespace}}
+			err := k8sClient.Create(ctx, ns)
+			if err != nil && !errors.IsAlreadyExists(err) {
+				Expect(err).NotTo(HaveOccurred())
+			}
+			owner = &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{Name: "jumpstarter", Namespace: namespace},
+			}
+			err = k8sClient.Create(ctx, owner)
+			if err != nil && !errors.IsAlreadyExists(err) {
+				Expect(err).NotTo(HaveOccurred())
+			}
+
+			existing := &corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "jumpstarter-telemetry",
+					Namespace: namespace,
+				},
+				Spec: corev1.ServiceSpec{
+					Selector: map[string]string{"app": "jumpstarter-telemetry"},
+					Ports: []corev1.ServicePort{
+						{Name: "grpc", Port: 9093, TargetPort: intstr.FromInt(9093)},
+						{Name: "metrics", Port: 8080, TargetPort: intstr.FromInt(8080)},
+					},
+					Type: corev1.ServiceTypeClusterIP,
+				},
+			}
+			err = k8sClient.Create(ctx, existing)
+			if err != nil && !errors.IsAlreadyExists(err) {
+				Expect(err).NotTo(HaveOccurred())
+			}
+		})
+
+		It("creates a NodePort service without replacing the dual-port ClusterIP", func() {
+			endpoint := &operatorv1alpha1.Endpoint{
+				Address: "telemetry.example.com",
+				NodePort: &operatorv1alpha1.NodePortConfig{
+					Enabled: true,
+					Port:    30093,
+				},
+			}
+			svcPort := corev1.ServicePort{
+				Name:       "jumpstarter-telemetry",
+				Port:       9093,
+				TargetPort: intstr.FromInt(9093),
+				Protocol:   corev1.ProtocolTCP,
+			}
+			Expect(reconciler.ReconcileTelemetryEndpoint(ctx, owner, endpoint, svcPort)).To(Succeed())
+
+			np := &corev1.Service{}
+			Expect(k8sClient.Get(ctx, types.NamespacedName{
+				Name: "jumpstarter-telemetry-np", Namespace: namespace,
+			}, np)).To(Succeed())
+			Expect(np.Spec.Type).To(Equal(corev1.ServiceTypeNodePort))
+			Expect(np.Spec.Selector).To(HaveKeyWithValue("app", "jumpstarter-telemetry"))
+
+			clusterIP := &corev1.Service{}
+			Expect(k8sClient.Get(ctx, types.NamespacedName{
+				Name: "jumpstarter-telemetry", Namespace: namespace,
+			}, clusterIP)).To(Succeed())
+			Expect(clusterIP.Spec.Ports).To(HaveLen(2))
+		})
+
+		AfterEach(func() {
+			for _, name := range []string{"jumpstarter-telemetry", "jumpstarter-telemetry-np", "jumpstarter-telemetry-lb"} {
+				_ = k8sClient.Delete(ctx, &corev1.Service{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespace}})
+			}
+			_ = k8sClient.Delete(ctx, owner)
+		})
+	})
+
 })
