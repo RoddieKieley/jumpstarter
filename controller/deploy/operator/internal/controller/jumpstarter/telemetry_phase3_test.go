@@ -83,11 +83,11 @@ var _ = Describe("createTelemetryDeployment JEP-0013 Phase 3", func() {
 	})
 
 	It("sets GRPC_TELEMETRY_ENDPOINT to the first telemetry endpoint with port 443", func() {
-		js := phase3TelemetryJS("js", "jumpstarter-lab")
+		js := phase3TelemetryJS("jumpstarter-lab")
 		js.Spec.Telemetry.Endpoints = []operatorv1alpha1.Endpoint{
 			{Address: "telemetry.jumpstarter.jumpstarter-lab.apps.okd.kieley.io"},
 		}
-		c := createTelemetryDeployment(js, "").Spec.Template.Spec.Containers[0]
+		c := createTelemetryDeployment(js, "", telemetryLokiPod{}).Spec.Template.Spec.Containers[0]
 		Expect(envValue(c, "GRPC_TELEMETRY_ENDPOINT")).To(Equal(
 			"telemetry.jumpstarter.jumpstarter-lab.apps.okd.kieley.io:443"))
 	})
