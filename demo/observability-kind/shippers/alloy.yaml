@@ -1,0 +1,59 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: demo-alloy-shipper
+  namespace: jumpstarter-lab
+spec:
+  selector:
+    matchLabels:
+      app: demo-alloy-shipper
+  template:
+    metadata:
+      labels:
+        app: demo-alloy-shipper
+    spec:
+      serviceAccountName: jumpstarter-shipper
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
+        - key: node-role.kubernetes.io/master
+          operator: Exists
+          effect: NoSchedule
+      containers:
+        - name: alloy
+          image: grafana/alloy:v1.21.3
+          imagePullPolicy: IfNotPresent
+          args:
+            - run
+            - --disable-reporting
+            - --server.http.listen-addr=0.0.0.0:12345
+            - --storage.path=/var/lib/alloy/data
+            - /etc/alloy/config.alloy
+          env:
+            - name: HOSTNAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+          volumeMounts:
+            - name: config
+              mountPath: /etc/alloy
+              readOnly: true
+            - name: data
+              mountPath: /var/lib/alloy
+            - name: pod-logs
+              mountPath: /var/log/pods
+              readOnly: true
+      volumes:
+        - name: config
+          configMap:
+            name: jumpstarter-log-shipper
+            items:
+              - key: alloy.alloy
+                path: config.alloy
+        - name: data
+          emptyDir: {}
+        - name: pod-logs
+          hostPath:
+            path: /var/log/pods
+            type: Directory
