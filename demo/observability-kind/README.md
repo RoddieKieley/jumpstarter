@@ -20,6 +20,7 @@ configuration and labels; it does not deploy or manage the shipper runtime.
 
 - Linux or macOS with Docker or Podman
 - `kind`, `kubectl`, `curl`, `jq`
+- `asciinema` is optional, for playing the recorded walkthrough
 - Network access to pull:
   - `kindest/node` for the Kind cluster
   - Prometheus Operator `v0.94.2`
@@ -63,6 +64,28 @@ Useful overrides:
 ```sh
 CONTAINER_TOOL=podman SKIP_SETUP=1 ./demo/observability-kind/run.sh
 KUBECTL="kubectl --context kind-jumpstarter" ./demo/observability-kind/run.sh
+```
+
+## Recorded walkthrough
+
+A terminal recording of the observability portion is available as
+[`demo.cast`](./demo.cast). It was recorded against an already-deployed Kind
+cluster with `SKIP_SETUP=1`, using alternate local port-forwards so it could
+run alongside an existing demo session.
+
+Play it with:
+
+```sh
+asciinema play --speed 2 demo/observability-kind/demo.cast
+```
+
+The recording contains the Vector, Alloy, and Promtail passes, the metrics
+target-health check, and the 68-second disable/re-enable recovery.
+
+For the full setup path, run the demo directly:
+
+```sh
+./demo/observability-kind/run.sh
 ```
 
 ## Expected result
