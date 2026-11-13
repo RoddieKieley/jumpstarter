@@ -13,6 +13,10 @@ consistent automated testing across real hardware and virtual environments with
 CI/CD integration. Every interface is programmatic, so human developers, test
 scripts, CI pipelines, and AI agents interact with devices through the same APIs.
 
+> **Fork notice:** This repository is a personal fork of
+> [jumpstarter-dev/jumpstarter](https://github.com/jumpstarter-dev/jumpstarter),
+> maintained to exercise the fullsend agent pipeline end to end.
+
 ## Highlights
 
 - 🧪 **Unified Testing** - One tool for physical and virtual devices under test
