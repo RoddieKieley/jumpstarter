@@ -153,10 +153,10 @@ func TestReconcileObservabilityReportsMetricsServiceFailure(t *testing.T) {
 	if !strings.Contains(err.Error(), "injected metrics Service create failure") {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if result.phase != serviceMonitorApplyFailed {
-		t.Fatalf("phase = %v, want serviceMonitorApplyFailed", result.phase)
+	if result.serviceMonitor.phase != serviceMonitorApplyFailed {
+		t.Fatalf("phase = %v, want serviceMonitorApplyFailed", result.serviceMonitor.phase)
 	}
-	ready, reason, message := result.condition()
+	ready, reason, message := result.serviceMonitor.condition()
 	if ready || reason != serviceMonitorReasonFailed {
 		t.Fatalf("condition = %v/%q, want false/%s", ready, reason, serviceMonitorReasonFailed)
 	}
@@ -207,7 +207,8 @@ type serviceMonitorListNotFoundClient struct {
 }
 
 func (c *serviceMonitorListNotFoundClient) List(ctx context.Context, list client.ObjectList, opts ...client.ListOption) error {
-	if _, ok := list.(*unstructured.UnstructuredList); ok {
+	if monitors, ok := list.(*unstructured.UnstructuredList); ok &&
+		monitors.GroupVersionKind().Kind == serviceMonitorKind+"List" {
 		return apierrors.NewNotFound(schema.GroupResource{
 			Group: serviceMonitorGroup, Resource: "servicemonitors",
 		}, "")
@@ -226,8 +227,11 @@ func TestReconcileObservabilityTreatsListNotFoundAsAbsentCRD(t *testing.T) {
 	if err != nil {
 		t.Fatalf("reconcileObservability must not fail when the API is gone: %v", err)
 	}
-	if result.phase != serviceMonitorWaitingForCRD || result.reason != serviceMonitorReasonCRDNotFound {
-		t.Fatalf("result = %v/%q, want %v/%s", result.phase, result.reason, serviceMonitorWaitingForCRD, serviceMonitorReasonCRDNotFound)
+	if result.serviceMonitor.phase != serviceMonitorWaitingForCRD ||
+		result.serviceMonitor.reason != serviceMonitorReasonCRDNotFound {
+		t.Fatalf("result = %v/%q, want %v/%s",
+			result.serviceMonitor.phase, result.serviceMonitor.reason,
+			serviceMonitorWaitingForCRD, serviceMonitorReasonCRDNotFound)
 	}
 }
 

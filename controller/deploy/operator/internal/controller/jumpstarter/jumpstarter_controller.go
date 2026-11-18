@@ -104,6 +104,7 @@ type JumpstarterReconciler struct {
 
 // Monitoring resources
 // +kubebuilder:rbac:groups=monitoring.coreos.com,resources=servicemonitors,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=monitoring.coreos.com,resources=prometheusrules,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=apiextensions.k8s.io,resources=customresourcedefinitions,verbs=get;list;watch
 
 // cert-manager resources (for TLS certificate management)
@@ -280,11 +281,11 @@ func (r *JumpstarterReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		return ctrl.Result{}, err
 	}
 
-	// Reconcile observability integration: metrics Services and ServiceMonitors.
-	// These are optional integrations, so a failure must not abort the rest of the
-	// Jumpstarter reconcile (status, ConfigMaps, Secrets). The condition reports
-	// the failure and a short requeue retries it.
-	serviceMonitor, observabilityErr := r.reconcileObservability(ctx, &jumpstarter)
+	// Reconcile observability integration: metrics Services, ServiceMonitors and
+	// starter PrometheusRules. These are optional integrations, so a failure must
+	// not abort the rest of the Jumpstarter reconcile (status, ConfigMaps,
+	// Secrets). The conditions report failures and a short requeue retries them.
+	observability, observabilityErr := r.reconcileObservability(ctx, &jumpstarter)
 	if observabilityErr != nil {
 		log.Error(observabilityErr, "Failed to reconcile observability integration")
 	}
@@ -304,7 +305,7 @@ func (r *JumpstarterReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	// Update status before returning an observability error. This preserves the
 	// condition information while letting controller-runtime apply backoff and
 	// record the reconcile error metric.
-	if err := r.updateStatus(ctx, &jumpstarter, serviceMonitor); err != nil {
+	if err := r.updateStatus(ctx, &jumpstarter, observability); err != nil {
 		log.Error(err, "Failed to update status")
 		return ctrl.Result{}, err
 	}
@@ -312,30 +313,40 @@ func (r *JumpstarterReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		return ctrl.Result{}, fmt.Errorf("observability: %w", observabilityErr)
 	}
 
-	requeueAfter := r.observabilityRequeueAfter(ctx, &jumpstarter, serviceMonitor)
+	requeueAfter := r.observabilityRequeueAfter(ctx, &jumpstarter, observability)
 	return ctrl.Result{RequeueAfter: requeueAfter}, nil
 }
 
 // observabilityRequeueAfter keeps the normal periodic reconciliation interval
-// but shortens it while observability needs attention. A missing ServiceMonitor
+// but shortens it while an observability integration needs attention. A missing
 // CRD or a failed probe/apply uses a two-minute retry; a later-installed CRD is
 // also picked up immediately by the CRD watch.
 func (r *JumpstarterReconciler) observabilityRequeueAfter(
 	ctx context.Context,
 	js *operatorv1alpha1.Jumpstarter,
-	serviceMonitor serviceMonitorResult,
+	observability observabilityResult,
 ) time.Duration {
 	requeueAfter := 30 * time.Minute
 	if r.telemetryCANeedsRequeue(ctx, js) {
 		requeueAfter = telemetryCARequeueInterval
 	}
-	if requeueAfter > 2*time.Minute {
-		switch serviceMonitor.phase {
-		case serviceMonitorWaitingForCRD, serviceMonitorProbeFailed, serviceMonitorApplyFailed:
-			requeueAfter = 2 * time.Minute
-		}
+	if requeueAfter > 2*time.Minute &&
+		(needsFastRequeue(observability.serviceMonitor.phase) ||
+			needsFastRequeue(observability.prometheusRules.phase)) {
+		requeueAfter = 2 * time.Minute
 	}
 	return requeueAfter
+}
+
+// needsFastRequeue reports whether an integration should be retried at the
+// short fallback interval.
+func needsFastRequeue(phase integrationPhase) bool {
+	switch phase {
+	case integrationWaitingForCRD, integrationProbeFailed, integrationApplyFailed:
+		return true
+	default:
+		return false
+	}
 }
 
 // emitEventf emits a Kubernetes event on the Jumpstarter object.
@@ -2005,18 +2016,25 @@ func (r *JumpstarterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		return requests
 	}
 
-	// mapServiceMonitorCRDToJumpstarters enqueues all Jumpstarter CRs when the
-	// optional ServiceMonitor CRD is installed or updated. This complements the
-	// bounded fallback requeue while the CRD is absent.
-	mapServiceMonitorCRDToJumpstarters := func(ctx context.Context, obj client.Object) []ctrl.Request {
+	// mapObservabilityCRDToJumpstarters enqueues all Jumpstarter CRs when one of
+	// the optional observability CRDs is installed or updated. This complements
+	// the bounded fallback requeue while a CRD is absent.
+	observabilityCRDNames := map[string]struct{}{
+		serviceMonitorCRDName: {},
+		prometheusRuleCRDName: {},
+	}
+	mapObservabilityCRDToJumpstarters := func(ctx context.Context, obj client.Object) []ctrl.Request {
 		crd, ok := obj.(*apiextensionsv1.CustomResourceDefinition)
-		if !ok || crd.Name != serviceMonitorCRDName {
+		if !ok {
+			return nil
+		}
+		if _, watched := observabilityCRDNames[crd.Name]; !watched {
 			return nil
 		}
 
 		var jumpstarterList operatorv1alpha1.JumpstarterList
 		if err := mgr.GetClient().List(ctx, &jumpstarterList); err != nil {
-			logf.FromContext(ctx).Error(err, "Failed to list Jumpstarters for ServiceMonitor CRD change")
+			logf.FromContext(ctx).Error(err, "Failed to list Jumpstarters for observability CRD change")
 			return nil
 		}
 
@@ -2038,7 +2056,7 @@ func (r *JumpstarterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		// Note: Secrets and ServiceAccounts are intentionally NOT owned to prevent deletion.
 		// We watch Secrets referenced as JWT CA certificates and TLS certs so that
 		// rotations trigger reconciliation and rolling restarts via hash annotations.
-		Watches(&apiextensionsv1.CustomResourceDefinition{}, handler.EnqueueRequestsFromMapFunc(mapServiceMonitorCRDToJumpstarters)).
+		Watches(&apiextensionsv1.CustomResourceDefinition{}, handler.EnqueueRequestsFromMapFunc(mapObservabilityCRDToJumpstarters)).
 		Watches(&corev1.Secret{}, handler.EnqueueRequestsFromMapFunc(mapSecretToJumpstarters)).
 		Watches(&corev1.ConfigMap{}, handler.EnqueueRequestsFromMapFunc(mapConfigMapToJumpstarters)).
 		Complete(r)

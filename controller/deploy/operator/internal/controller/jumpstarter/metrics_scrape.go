@@ -204,14 +204,23 @@ func (r *JumpstarterReconciler) reconcileMetricsServices(ctx context.Context, js
 	return nil
 }
 
-type serviceMonitorPhase int
+type integrationPhase int
 
 const (
-	serviceMonitorDisabled serviceMonitorPhase = iota
-	serviceMonitorWaitingForCRD
-	serviceMonitorProbeFailed
-	serviceMonitorApplyFailed
-	serviceMonitorActive
+	integrationDisabled integrationPhase = iota
+	integrationWaitingForCRD
+	integrationProbeFailed
+	integrationApplyFailed
+	integrationActive
+)
+
+// Phase 5 names kept as aliases while the integrations share one result type.
+const (
+	serviceMonitorDisabled      = integrationDisabled
+	serviceMonitorWaitingForCRD = integrationWaitingForCRD
+	serviceMonitorProbeFailed   = integrationProbeFailed
+	serviceMonitorApplyFailed   = integrationApplyFailed
+	serviceMonitorActive        = integrationActive
 )
 
 const (
@@ -221,17 +230,28 @@ const (
 	serviceMonitorReasonFailed      = "Failed"
 )
 
-// serviceMonitorResult is the single source of truth for the ServiceMonitor
-// condition and requeue decision in a reconcile. The accompanying error return
-// carries any retryable failure; the result only describes what was observed.
-type serviceMonitorResult struct {
-	phase   serviceMonitorPhase
+// integrationResult is the single source of truth for one optional
+// integration's condition and requeue decision in a reconcile. The
+// accompanying error return carries any retryable failure; the result only
+// describes what was observed.
+type integrationResult struct {
+	phase   integrationPhase
 	reason  string
 	message string
 }
 
-func (r serviceMonitorResult) condition() (bool, string, string) {
-	return r.phase == serviceMonitorActive, r.reason, r.message
+// serviceMonitorResult is the Phase 5 name for the shared result type.
+type serviceMonitorResult = integrationResult
+
+func (r integrationResult) condition() (bool, string, string) {
+	return r.phase == integrationActive, r.reason, r.message
+}
+
+// observabilityResult is the outcome of every optional observability
+// integration attempted in one reconcile.
+type observabilityResult struct {
+	serviceMonitor  integrationResult
+	prometheusRules integrationResult
 }
 
 // serviceMonitorCRDAvailable reports whether monitoring.coreos.com/v1 serves the
@@ -481,11 +501,13 @@ func (r *JumpstarterReconciler) deleteObjectIfExists(ctx context.Context, js *op
 	return nil
 }
 
-// reconcileObservability reconciles metrics Services and ServiceMonitors. It
-// never blocks lease operations: each optional integration is attempted
-// independently, failures are collected for retry, and the caller reports them
-// through status conditions instead of aborting the Jumpstarter reconcile.
-func (r *JumpstarterReconciler) reconcileObservability(ctx context.Context, js *operatorv1alpha1.Jumpstarter) (serviceMonitorResult, error) {
+// reconcileObservability reconciles metrics Services, ServiceMonitors and
+// starter PrometheusRules. It never blocks lease operations: each optional
+// integration is attempted independently, failures are collected for retry, and
+// the caller reports them through status conditions instead of aborting the
+// Jumpstarter reconcile.
+func (r *JumpstarterReconciler) reconcileObservability(ctx context.Context, js *operatorv1alpha1.Jumpstarter) (observabilityResult, error) {
+	var result observabilityResult
 	var errs []error
 
 	metricsErr := r.reconcileMetricsServices(ctx, js)
@@ -493,17 +515,38 @@ func (r *JumpstarterReconciler) reconcileObservability(ctx context.Context, js *
 		errs = append(errs, fmt.Errorf("metrics services: %w", metricsErr))
 	}
 
+	serviceMonitor, err := r.reconcileServiceMonitorResult(ctx, js, metricsErr)
+	if err != nil {
+		errs = append(errs, err)
+	}
+	result.serviceMonitor = serviceMonitor
+
+	prometheusRules, err := r.reconcilePrometheusRules(ctx, js)
+	if err != nil {
+		errs = append(errs, err)
+	}
+	result.prometheusRules = prometheusRules
+
+	return result, errors.Join(errs...)
+}
+
+// reconcileServiceMonitorResult reconciles ServiceMonitors and returns the
+// condition and requeue result for this reconcile. metricsErr is the outcome of
+// reconciling the Services the monitors select; a failure there means the scrape
+// path is incomplete even when the monitors themselves were applied.
+func (r *JumpstarterReconciler) reconcileServiceMonitorResult(ctx context.Context, js *operatorv1alpha1.Jumpstarter, metricsErr error) (integrationResult, error) {
 	if !serviceMonitorEnabled(js) {
 		// Prune any monitors left by a previous configuration without probing
 		// for the optional CRD. A missing CRD has no monitors to prune.
-		if err := r.reconcileServiceMonitors(ctx, js); err != nil {
-			errs = append(errs, fmt.Errorf("service monitors: %w", err))
-		}
-		return serviceMonitorResult{
-			phase:   serviceMonitorDisabled,
+		result := integrationResult{
+			phase:   integrationDisabled,
 			reason:  serviceMonitorReasonDisabled,
 			message: "Prometheus autodiscovery is disabled by spec.telemetry.metrics.serviceMonitor",
-		}, errors.Join(errs...)
+		}
+		if err := r.reconcileServiceMonitors(ctx, js); err != nil {
+			return result, fmt.Errorf("service monitors: %w", err)
+		}
+		return result, nil
 	}
 
 	crdAvailable, crdErr := r.serviceMonitorCRDAvailable(ctx)
@@ -511,47 +554,44 @@ func (r *JumpstarterReconciler) reconcileObservability(ctx context.Context, js *
 		// A transient API/RBAC error must not be mistaken for an absent CRD:
 		// deleting the monitors here would cause churn and data loss.
 		logf.FromContext(ctx).Error(crdErr, "Failed to detect ServiceMonitor CRD; leaving ServiceMonitors unchanged")
-		errs = append(errs, fmt.Errorf("service monitor CRD detection: %w", crdErr))
-		return serviceMonitorResult{
-			phase:   serviceMonitorProbeFailed,
+		return integrationResult{
+			phase:   integrationProbeFailed,
 			reason:  serviceMonitorReasonFailed,
 			message: fmt.Sprintf("failed to detect ServiceMonitor CRD: %v", crdErr),
-		}, errors.Join(errs...)
+		}, fmt.Errorf("service monitor CRD detection: %w", crdErr)
 	}
 	if !crdAvailable {
-		return serviceMonitorResult{
-			phase:   serviceMonitorWaitingForCRD,
+		return integrationResult{
+			phase:   integrationWaitingForCRD,
 			reason:  serviceMonitorReasonCRDNotFound,
 			message: "monitoring.coreos.com/v1 ServiceMonitor CRD is not installed",
-		}, errors.Join(errs...)
+		}, nil
 	}
 
 	monitorErr := r.reconcileServiceMonitors(ctx, js)
-	if monitorErr != nil {
-		errs = append(errs, fmt.Errorf("service monitors: %w", monitorErr))
-	}
 
 	// Readiness describes the whole autodiscovery path. ServiceMonitors can be
 	// created while the Services they select were not reconciled, so a Service
-	// failure must not report Created.
+	// failure must not report Created. The metrics error is already collected by
+	// the caller, so it is not returned again here.
 	switch {
 	case monitorErr != nil:
-		return serviceMonitorResult{
-			phase:   serviceMonitorApplyFailed,
+		return integrationResult{
+			phase:   integrationApplyFailed,
 			reason:  serviceMonitorReasonFailed,
 			message: fmt.Sprintf("failed to reconcile ServiceMonitors: %v", monitorErr),
-		}, errors.Join(errs...)
+		}, fmt.Errorf("service monitors: %w", monitorErr)
 	case metricsErr != nil:
-		return serviceMonitorResult{
-			phase:   serviceMonitorApplyFailed,
+		return integrationResult{
+			phase:   integrationApplyFailed,
 			reason:  serviceMonitorReasonFailed,
 			message: fmt.Sprintf("failed to reconcile metrics Services: %v", metricsErr),
-		}, errors.Join(errs...)
+		}, nil
 	}
 
-	return serviceMonitorResult{
-		phase:   serviceMonitorActive,
+	return integrationResult{
+		phase:   integrationActive,
 		reason:  serviceMonitorReasonCreated,
 		message: fmt.Sprintf("ServiceMonitors are configured for %d workloads", len(desiredServiceMonitors(js))),
-	}, errors.Join(errs...)
+	}, nil
 }
