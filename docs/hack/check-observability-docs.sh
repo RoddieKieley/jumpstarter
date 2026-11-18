@@ -88,6 +88,10 @@ require 'Promtail discovery example' 'kubernetes_sd_configs'
 require 'stream-label guidance' \
   'promote `component`, `exporter`, and `namespace` to Loki stream labels'
 
+# Phase 6 starter alert rules contract.
+require 'starter alert rules field' 'prometheusRules'
+require 'PrometheusRulesReady condition' 'PrometheusRulesReady'
+
 # Validation commands for every documented shipper.
 require 'Promtail validation command' '-check-syntax'
 require 'Alloy validation command' 'alloy validate'
