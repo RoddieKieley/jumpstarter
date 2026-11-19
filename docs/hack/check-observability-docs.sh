@@ -113,6 +113,8 @@ else
   require_in "$dash_doc" 'offline percli validation target' 'test-phase6-dashboards'
   require_in "$dash_doc" 'datasource name mapping' 'metadata.name'
   require_in "$dash_doc" 'missing datasource behavior' 'panel query error'
+  require_in "$dash_doc" 'minimum perses-operator version' 'v0.3.0'
+  require_in "$dash_doc" 'legacy v1alpha1 behavior' 'serves only v1alpha1'
 fi
 
 # Validation commands for every documented shipper.
