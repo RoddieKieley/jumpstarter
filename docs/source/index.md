@@ -28,23 +28,32 @@ consistent automated testing across real hardware and virtual environments with
 CI/CD integration. Every interface is programmatic, so human developers, test
 scripts, CI pipelines, and AI agents interact with devices through the same APIs.
 
-See Jumpstarter in action:
+See Jumpstarter in action. This recording leases an exporter, drives a power
+operation on it, and then follows that one operation through the metrics the
+exporter publishes, the alerting and dashboards the operator generates, and the
+logs the cluster collects:
 
 ```{raw} html
 <div id="demo-player"></div>
 <script>
   document.addEventListener('DOMContentLoaded', function() {
-    AsciinemaPlayer.create('_static/demo.cast', document.getElementById('demo-player'), {
-      fit: 'width',
-      autoPlay: false,
-      poster: 'npt:0:05',
-      loop: true,
-      // The recording is already paced to be readable, so play it as recorded.
-      speed: 1,
-      rows: 25
-      // Chapter markers are embedded in the recording itself, so they cannot
-      // drift out of step with it. See demo/README.md.
-    });
+    AsciinemaPlayer.create(
+      '_static/casts/jep-0013-phase456-integration.cast',
+      document.getElementById('demo-player'),
+      {
+        fit: 'width',
+        autoPlay: false,
+        preload: false,
+        idleTimeLimit: 2,
+        poster: 'npt:7:39',
+        loop: true,
+        // The recording is already paced to be readable, so play it as recorded.
+        speed: 1,
+        rows: 25
+        // Chapter markers are embedded in the recording itself, so they cannot
+        // drift out of step with it. See demo/README.md.
+      }
+    );
   });
 </script>
 ```

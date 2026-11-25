@@ -1,0 +1,63 @@
+# Prometheus instance for the JEP-0013 demo.
+#
+# The Prometheus Operator itself is installed by setup.sh from the pinned
+# v0.94.2 bundle; this file installs the instance and the RBAC it needs to
+# discover Jumpstarter monitors in the demo namespace.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: prometheus-jumpstarter-demo
+  namespace: jumpstarter-lab
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: prometheus-jumpstarter-demo
+rules:
+  - apiGroups: [""]
+    resources: [services, endpoints, pods, namespaces, configmaps]
+    verbs: [get, list, watch]
+  - apiGroups: [discovery.k8s.io]
+    resources: [endpointslices]
+    verbs: [get, list, watch]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: prometheus-jumpstarter-demo
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: prometheus-jumpstarter-demo
+subjects:
+  - kind: ServiceAccount
+    name: prometheus-jumpstarter-demo
+    namespace: jumpstarter-lab
+---
+apiVersion: monitoring.coreos.com/v1
+kind: Prometheus
+metadata:
+  name: jumpstarter-demo
+  namespace: jumpstarter-lab
+spec:
+  serviceAccountName: prometheus-jumpstarter-demo
+  replicas: 1
+  retention: 1h
+  scrapeInterval: 5s
+  evaluationInterval: 5s
+  serviceMonitorSelector:
+    matchLabels:
+      jumpstarter.dev/metrics: "true"
+  serviceMonitorNamespaceSelector: {}
+  ruleSelector:
+    matchLabels:
+      jumpstarter.dev/prometheus-rules: "true"
+  ruleNamespaceSelector: {}
+  podMonitorSelector: {}
+  probeSelector: {}
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      memory: 512Mi

@@ -93,6 +93,9 @@ jobs:
       - name: Verify the observability documentation contract
         run: make docs-check-observability
 
+      - name: Verify the observability demo recordings
+        run: make docs-check-casts
+
       - name: Verify generated gRPC docs are up to date
         run: make docs-check-grpc
 

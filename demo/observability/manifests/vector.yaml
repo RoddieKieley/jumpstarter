@@ -1,0 +1,122 @@
+# Vector ships the pods labelled jumpstarter.dev/log-scrape="true" to Loki.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: vector
+  namespace: jumpstarter-lab
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: vector-jumpstarter-demo
+rules:
+  - apiGroups: [""]
+    resources: [pods, namespaces]
+    verbs: [get, list, watch]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: vector-jumpstarter-demo
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: vector-jumpstarter-demo
+subjects:
+  - kind: ServiceAccount
+    name: vector
+    namespace: jumpstarter-lab
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vector
+  namespace: jumpstarter-lab
+data:
+  vector.yaml: |
+    data_dir: /vector-data-dir
+    sources:
+      k8s:
+        type: kubernetes_logs
+        extra_label_selector: "jumpstarter.dev/log-scrape=true"
+        namespace_annotation_fields: {}
+    transforms:
+      parse:
+        type: remap
+        inputs: [k8s]
+        source: |
+          parsed, err = parse_json(.message)
+          if err == null && is_object(parsed) {
+            . = merge!(., parsed)
+          }
+    sinks:
+      loki:
+        type: loki
+        inputs: [parse]
+        endpoint: http://loki.jumpstarter-lab.svc.cluster.local:3100
+        encoding:
+          codec: json
+        labels:
+          component: "{{ .component }}"
+          exporter: "{{ .exporter }}"
+          namespace: "{{ .kubernetes.pod_namespace }}"
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: vector
+  namespace: jumpstarter-lab
+  labels:
+    app: vector
+spec:
+  selector:
+    matchLabels:
+      app: vector
+  template:
+    metadata:
+      labels:
+        app: vector
+    spec:
+      serviceAccountName: vector
+      containers:
+        - name: vector
+          image: docker.io/timberio/vector:0.44.0-alpine
+          args: ["--config", "/etc/vector/vector.yaml"]
+          env:
+            - name: VECTOR_SELF_NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: VECTOR_SELF_POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              memory: 256Mi
+          volumeMounts:
+            - name: config
+              mountPath: /etc/vector
+            - name: data
+              mountPath: /vector-data-dir
+            - name: var-log
+              mountPath: /var/log
+              readOnly: true
+            - name: var-lib
+              mountPath: /var/lib
+              readOnly: true
+      volumes:
+        - name: config
+          configMap:
+            name: vector
+        - name: data
+          emptyDir: {}
+        - name: var-log
+          hostPath:
+            path: /var/log
+        - name: var-lib
+          hostPath:
+            path: /var/lib

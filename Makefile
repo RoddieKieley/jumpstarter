@@ -80,11 +80,20 @@ demo-verify:
 demo-play:
 	asciinema play docs/source/_static/demo.cast
 
+# ---- JEP-0013 observability demo (Phases 4-6) ----
+
+.PHONY: demo-observability-setup demo-observability-verify
+demo-observability-setup:
+	@bash demo/observability/setup.sh
+
+demo-observability-verify:
+	@./demo/observability_demo.py --phase all --no-cast --speed 8
+
 # ---- Documentation targets ----
 
 .PHONY: docs docs-singlehtml docs-all docs-serve docs-serve-all docs-linkcheck \
 	docs-test docs-test-grpc docs-check-grpc docs-check-observability \
-	docs-generate-crds docs-generate-grpc clean-docs
+	docs-check-casts docs-generate-crds docs-generate-grpc clean-docs
 
 docs-generate-crds:
 	$(UV_DOCS) python3 ../docs/source/reference/generate-crd-docs.py
@@ -94,6 +103,9 @@ docs-generate-grpc:
 
 docs-check-observability:
 	@./docs/hack/check-observability-docs.sh
+
+docs-check-casts:
+	@./docs/hack/check-demo-casts.sh
 
 docs: docs-generate-crds docs-generate-grpc
 	$(UV_DOCS) $(MAKE) -C ../docs html SPHINXOPTS="-W --keep-going -n"

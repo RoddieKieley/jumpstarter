@@ -232,6 +232,53 @@ escape sequences stripped, which is what makes the recording a real test:
 if the flashed image does not boot, or a test fails, the script
 fails instead of recording a broken demo.
 
+## Observability recordings (JEP-0013)
+
+`demo/observability_demo.py` records the JEP-0013 phases against a Kind cluster,
+using the same harness and the same rule: every step asserts on its own output,
+so a recording only exists if the thing it shows actually worked.
+
+The environment is separate from the board demo. `demo/observability/setup.sh`
+installs Prometheus Operator, Prometheus, Loki, Vector for log collection, and
+the Perses server chart, then provisions the Perses project, datasources, and
+dashboard through the Perses API (`demo/observability/provision-perses.sh`).
+The exporter is the reference `MockPower` + `MockStorageMux` pair, created with
+`jmp admin create exporter` and run with `jmp run --exporter demo-power`.
+
+| Recording | Covers |
+| --- | --- |
+| `docs/source/_static/casts/jep-0013-phase4-driver-telemetry.cast` | operation counts, driver instruments, exemplars |
+| `docs/source/_static/casts/jep-0013-phase5-log-scraping.cast` | discovery labels, structured records, log-store query |
+| `docs/source/_static/casts/jep-0013-phase6-dashboards-alerting.cast` | readiness conditions, generated objects, alerts, dashboard |
+| `docs/source/_static/casts/jep-0013-phase456-integration.cast` | one lease followed through metric, alert, dashboard, and log |
+
+Play one with `asciinema play <path>`; the docs embed all four and the combined
+recording plays on the landing page.
+
+Setup is unrecorded: each cast starts from a ready cluster and a running
+exporter, so the recording shows the observability behaviour rather than the
+installation.
+
+```sh
+make demo-observability-setup       # once per cluster
+make demo-observability-verify      # assert every phase, no recording
+demo/observability_demo.py --phase 4   # write the phase 4 cast, and so on
+demo/observability_demo.py --phase all # write the combined cast
+```
+
+### Demo client TLS
+
+The casts use a client config, `~/.config/jumpstarter/clients/demo-client.yaml`,
+with `tls.insecure: true`, because the Kind cluster's controller certificate is
+issued for the cluster's ingress name rather than for the address the demo
+reaches. Each recording says so on screen. This is a demo convenience, not a
+supported deployment mode: a real client trusts the Jumpstarter CA, and
+`jmp login` writes that configuration for you.
+
+Environment overrides: `DEMO_JMP`, `DEMO_CLIENT`, `DEMO_EXPORTER`,
+`DEMO_SELECTOR`, `DEMO_NAMESPACE`, `DEMO_LEASE`, and `DEMO_LEASE2`. Lease ids
+are generated per run so a re-record never collides with an abandoned lease.
+
 ## Other recordings
 
 `demo/casts/caib.cast` is unrelated to this script. It shows how the disk

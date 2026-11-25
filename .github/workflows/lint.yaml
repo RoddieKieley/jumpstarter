@@ -139,7 +139,7 @@ jobs:
           # without nullglob the loop would run once on the literal pattern.
           # The cast the documentation plays is always checked.
           shopt -s nullglob
-          for cast in docs/source/_static/demo.cast demo/casts/*.cast; do
+          for cast in docs/source/_static/demo.cast docs/source/_static/casts/*.cast demo/casts/*.cast; do
             python3 -c '
           import json, sys
           with open(sys.argv[1]) as f:
