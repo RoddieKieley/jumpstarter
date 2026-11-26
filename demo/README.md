@@ -245,12 +245,12 @@ dashboard through the Perses API (`demo/observability/provision-perses.sh`).
 The exporter is the reference `MockPower` + `MockStorageMux` pair, created with
 `jmp admin create exporter` and run with `jmp run --exporter demo-power`.
 
-| Recording | Covers |
-| --- | --- |
-| [`docs/source/_static/casts/jep-0013-phase4-driver-telemetry.cast`](../docs/source/_static/casts/jep-0013-phase4-driver-telemetry.cast) | operation counts, driver instruments, exemplars |
-| [`docs/source/_static/casts/jep-0013-phase5-log-scraping.cast`](../docs/source/_static/casts/jep-0013-phase5-log-scraping.cast) | discovery labels, structured records, log-store query |
-| [`docs/source/_static/casts/jep-0013-phase6-dashboards-alerting.cast`](../docs/source/_static/casts/jep-0013-phase6-dashboards-alerting.cast) | readiness conditions, generated objects, alerts, dashboard |
-| [`docs/source/_static/casts/jep-0013-phase456-integration.cast`](../docs/source/_static/casts/jep-0013-phase456-integration.cast) | one lease followed through metric, alert, dashboard, and log |
+| Phase | Recording | Covers |
+| --- | --- | --- |
+| 4 | [`docs/source/_static/casts/jep-0013-phase4-driver-telemetry.cast`](../docs/source/_static/casts/jep-0013-phase4-driver-telemetry.cast) | operation counts, driver instruments, exemplars |
+| 5 | [`docs/source/_static/casts/jep-0013-phase5-log-scraping.cast`](../docs/source/_static/casts/jep-0013-phase5-log-scraping.cast) | discovery labels, structured records, log-store query |
+| 6 | [`docs/source/_static/casts/jep-0013-phase6-dashboards-alerting.cast`](../docs/source/_static/casts/jep-0013-phase6-dashboards-alerting.cast) | readiness conditions, generated objects, alerts, dashboard |
+| 4, 5, and 6 | [`docs/source/_static/casts/jep-0013-phase456-integration.cast`](../docs/source/_static/casts/jep-0013-phase456-integration.cast) | one lease followed through metric, alert, dashboard, and log |
 
 Each path above links to the recording, so it can be opened or downloaded
 directly and played with `asciinema play <file>`; the docs embed all four and
