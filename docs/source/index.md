@@ -45,7 +45,7 @@ logs the cluster collects:
         autoPlay: false,
         preload: false,
         idleTimeLimit: 2,
-        poster: 'npt:7:39',
+        poster: 'npt:7:44',
         loop: true,
         // The recording is already paced to be readable, so play it as recorded.
         speed: 1,

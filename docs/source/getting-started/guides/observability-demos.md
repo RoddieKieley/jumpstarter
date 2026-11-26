@@ -34,7 +34,7 @@ an exemplar holding the lease id that produced the sample.
         rows: 25,
         speed: 1,
         loop: false,
-        poster: 'npt:2:26'
+        poster: 'npt:2:28'
       }
     );
   });
@@ -93,7 +93,7 @@ the dashboard Perses serves.
         rows: 25,
         speed: 1,
         loop: false,
-        poster: 'npt:1:15'
+        poster: 'npt:1:05'
       }
     );
   });
@@ -122,7 +122,7 @@ log store holds the same lease with the exporter attached.
         rows: 25,
         speed: 1,
         loop: false,
-        poster: 'npt:7:39'
+        poster: 'npt:7:44'
       }
     );
   });

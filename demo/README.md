@@ -266,6 +266,18 @@ demo/observability_demo.py --phase 4   # write the phase 4 cast, and so on
 demo/observability_demo.py --phase all # write the combined cast
 ```
 
+### Terminal width and long commands
+
+The recording is 110 columns wide; the pty behind it is 400. The pty's line
+discipline echoes typed characters itself, and when that echo reaches the pty's
+right margin it emits a bare carriage return and keeps writing on the same row,
+so in the cast the start of a long command is overwritten and unreadable. With a
+pty wider than the recording the echo stays on one line, and the player wraps it
+at 110 columns on playback, the way a terminal does. `observability_demo.py`
+passes `pty_cols=400` for this reason; `board_demo.py` keeps the default (pty
+width equals recording width) and can adopt the same setting when it is next
+re-recorded.
+
 ### Demo client TLS
 
 The casts use a client config, `~/.config/jumpstarter/clients/demo-client.yaml`,

@@ -164,6 +164,7 @@ class HumanShell:
         cast: Asciicast | None = None,
         cols: int = 110,
         rows: int = 32,
+        pty_cols: int | None = None,
         shell: str = "/bin/bash",
         seed: int = 20260929,
         speed: float = 1.0,
@@ -174,6 +175,14 @@ class HumanShell:
         self.cast = cast
         self.cols = cols
         self.rows = rows
+        # The pty may be wider than the recording. The line discipline echoes
+        # typed characters itself and, when that echo reaches the pty's right
+        # margin, it emits a bare carriage return and continues on the same
+        # row, so the recording overwrites the start of long commands. A wider
+        # pty never wraps that echo; the player wraps the line at `cols` on
+        # playback, which is what a real terminal does. `COLUMNS` stays at
+        # `cols` so programs that honour it still format for the recording.
+        self.pty_cols = pty_cols if pty_cols is not None else cols
         self.speed = speed
         self.rng = random.Random(seed)
         self.mirror = mirror if mirror is not None else sys.stdout.buffer
@@ -212,12 +221,16 @@ class HumanShell:
         self.pid, self.fd = pty.fork()
         if self.pid == 0:  # child
             try:
-                fcntl.ioctl(0, termios.TIOCSWINSZ, struct.pack("HHHH", rows, cols, 0, 0))
+                fcntl.ioctl(
+                    0, termios.TIOCSWINSZ, struct.pack("HHHH", rows, self.pty_cols, 0, 0)
+                )
                 os.execvpe(shell, [shell, "--norc", "--noprofile", "-i"], child_env)
             finally:
                 os._exit(127)
 
-        fcntl.ioctl(self.fd, termios.TIOCSWINSZ, struct.pack("HHHH", rows, cols, 0, 0))
+        fcntl.ioctl(
+            self.fd, termios.TIOCSWINSZ, struct.pack("HHHH", rows, self.pty_cols, 0, 0)
+        )
         self.wait_prompt(timeout=15)
         self.buf.clear()
 

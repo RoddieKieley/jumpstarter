@@ -83,6 +83,20 @@ assuming. Check both themes after any change to the colours or to
 `--comment-style` - the panel should look the same in each, with only the
 border blending.
 
+## Long commands and the pty width
+
+`HumanShell` may give the pty a different width from the recording
+(`pty_cols`). Keep the pty wider than the recording for anything that types
+long commands. The line discipline echoes typed characters itself, and when
+that echo reaches the pty's right margin it emits a bare carriage return and
+keeps writing on the same row: in the cast, the beginning of the command is
+overwritten and the viewer cannot read what was run. With a wider pty the echo
+stays on one line and the player wraps it at the recording width on playback,
+which is exactly what a terminal does. `demo/observability_demo.py` passes
+`pty_cols=400` against a 110 column recording. `board_demo.py` still uses the
+default (pty width equals recording width); give it the same treatment when it
+is next re-recorded, since its `kubectl` and `sshfs` lines are long.
+
 ## Nothing personal in the recording
 
 The cast is published, so it must not carry the recorder's identity or

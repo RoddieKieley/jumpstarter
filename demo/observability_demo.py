@@ -277,7 +277,16 @@ def main() -> int:
         venv_bin = str(REPO / "python" / ".venv" / "bin")
         env = dict(os.environ)
         env["PATH"] = venv_bin + os.pathsep + env.get("PATH", "")
-        sh = HumanShell(cast=cast, cols=110, rows=32, speed=args.speed, env=env)
+        sh = HumanShell(
+            cast=cast,
+            cols=110,
+            rows=32,
+            # Wider than the recording: the pty echo must not wrap long commands
+            # itself, or it overwrites the start of the line. See human_shell.py.
+            pty_cols=400,
+            speed=args.speed,
+            env=env,
+        )
         try:
             SEGMENTS[args.phase](sh)
         finally:
