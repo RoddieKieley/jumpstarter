@@ -20,7 +20,7 @@ by driver type and result, the power driver's own instruments beside them, and
 an exemplar holding the lease id that produced the sample.
 
 ```{raw} html
-<div id="cast-phase4"></div>
+<div id="cast-phase4" class="cast-player"></div>
 <script>
   document.addEventListener('DOMContentLoaded', function() {
     AsciinemaPlayer.create(
@@ -50,7 +50,7 @@ controller, evidence that the operator owns no shipper configuration, and a
 query against the log store that returns the labels the shipper promoted.
 
 ```{raw} html
-<div id="cast-phase5"></div>
+<div id="cast-phase5" class="cast-player"></div>
 <script>
   document.addEventListener('DOMContentLoaded', function() {
     AsciinemaPlayer.create(
@@ -79,7 +79,7 @@ conditions, the generated objects, the starter alerts Prometheus has loaded, and
 the dashboard Perses serves.
 
 ```{raw} html
-<div id="cast-phase6"></div>
+<div id="cast-phase6" class="cast-player"></div>
 <script>
   document.addEventListener('DOMContentLoaded', function() {
     AsciinemaPlayer.create(
@@ -108,7 +108,7 @@ changes state, the dashboard Perses serves is built from those queries, and the
 log store holds the same lease with the exporter attached.
 
 ```{raw} html
-<div id="cast-integration"></div>
+<div id="cast-integration" class="cast-player"></div>
 <script>
   document.addEventListener('DOMContentLoaded', function() {
     AsciinemaPlayer.create(
@@ -136,7 +136,7 @@ booted, tested, and handed back through a lease. It is the workflow the
 observability layers above are reporting on.
 
 ```{raw} html
-<div id="cast-board"></div>
+<div id="cast-board" class="cast-player"></div>
 <script>
   document.addEventListener('DOMContentLoaded', function() {
     AsciinemaPlayer.create(

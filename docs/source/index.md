@@ -34,7 +34,7 @@ exporter publishes, the alerting and dashboards the operator generates, and the
 logs the cluster collects:
 
 ```{raw} html
-<div id="demo-player"></div>
+<div id="demo-player" class="cast-player"></div>
 <script>
   document.addEventListener('DOMContentLoaded', function() {
     AsciinemaPlayer.create(
