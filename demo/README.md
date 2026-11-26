@@ -247,13 +247,14 @@ The exporter is the reference `MockPower` + `MockStorageMux` pair, created with
 
 | Recording | Covers |
 | --- | --- |
-| `docs/source/_static/casts/jep-0013-phase4-driver-telemetry.cast` | operation counts, driver instruments, exemplars |
-| `docs/source/_static/casts/jep-0013-phase5-log-scraping.cast` | discovery labels, structured records, log-store query |
-| `docs/source/_static/casts/jep-0013-phase6-dashboards-alerting.cast` | readiness conditions, generated objects, alerts, dashboard |
-| `docs/source/_static/casts/jep-0013-phase456-integration.cast` | one lease followed through metric, alert, dashboard, and log |
+| [`docs/source/_static/casts/jep-0013-phase4-driver-telemetry.cast`](../docs/source/_static/casts/jep-0013-phase4-driver-telemetry.cast) | operation counts, driver instruments, exemplars |
+| [`docs/source/_static/casts/jep-0013-phase5-log-scraping.cast`](../docs/source/_static/casts/jep-0013-phase5-log-scraping.cast) | discovery labels, structured records, log-store query |
+| [`docs/source/_static/casts/jep-0013-phase6-dashboards-alerting.cast`](../docs/source/_static/casts/jep-0013-phase6-dashboards-alerting.cast) | readiness conditions, generated objects, alerts, dashboard |
+| [`docs/source/_static/casts/jep-0013-phase456-integration.cast`](../docs/source/_static/casts/jep-0013-phase456-integration.cast) | one lease followed through metric, alert, dashboard, and log |
 
-Play one with `asciinema play <path>`; the docs embed all four and the combined
-recording plays on the landing page.
+Each path above links to the recording, so it can be opened or downloaded
+directly and played with `asciinema play <file>`; the docs embed all four and
+the combined recording plays on the landing page.
 
 Setup is unrecorded: each cast starts from a ready cluster and a running
 exporter, so the recording shows the observability behaviour rather than the
